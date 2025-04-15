@@ -3,8 +3,11 @@ import cors from "cors";
 import helmet from "helmet";
 import router from "./router";
 import { errorMiddleware } from "../middlewares/errorHandler";
+import { loadModels } from "./helpers";
 
 const app = express();
+
+loadModels()
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());

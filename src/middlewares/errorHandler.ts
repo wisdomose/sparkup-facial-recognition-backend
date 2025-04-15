@@ -8,24 +8,12 @@ export function errorMiddleware(
   res: Response,
   next: NextFunction
 ) {
-  try {
-    logger.error(error.message);
-    return res
-      .status(200)
-      .json({
-        error: true,
-        code: error.code,
-        message: error.message,
-      })
-      .end();
-  } catch (error) {
-    return res
-      .status(200)
-      .json({
-        code: 500,
-        error: true,
-        message: "An error occured",
-      })
-      .end();
-  }
+  logger.error(error.message);
+  return res
+    .status(error.code ?? 400)
+    .json({
+      code: error.code,
+      message: error.message,
+    })
+    .end();
 }
