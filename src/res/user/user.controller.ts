@@ -12,7 +12,7 @@ import logger from "../../lib/logger";
 import { SortOrder } from "mongoose";
 import { UserLocal } from "../../types/global";
 
-faceapi.env.monkeyPatch({ Canvas, Image });
+// faceapi.env.monkeyPatch({ Canvas, Image });
 
 //@ts-ignore
 export async function signup(
