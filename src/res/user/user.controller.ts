@@ -23,6 +23,7 @@ export async function signup(
     const { email, fullname, role, descriptor } = req.body;
     const users = await UserModel.find({ email: { $ne: email } });
 
+    if (descriptor.length === 0) throw new Error("Failed to enroll face");
     if (users.length === 0) {
       logger.info("SIGNUP: Creating first user");
       const user = await UserModel.create({
@@ -133,7 +134,6 @@ export async function login(
     // Read the image using canvas or other method
     const img = await loadImage(req.body.face)
       .then((img) => {
-        console.log("img loaded");
         return img;
       })
       .catch((error) => {
@@ -225,15 +225,13 @@ export async function findAll(
 
     const { limit = 10, page = 1, search = "", sort = "asc" } = req.query;
 
-    const users = await UserModel.find(
-      {
-        $or: [
-          { fullname: { $regex: search, $options: "i" }, role: "student" },
-          { email: { $regex: search, $options: "i" }, role: "student" },
-        ],
-      }
-    )
-      .select('-descriptor -__v')
+    const users = await UserModel.find({
+      $or: [
+        { fullname: { $regex: search, $options: "i" }, role: "student" },
+        { email: { $regex: search, $options: "i" }, role: "student" },
+      ],
+    })
+      .select("-descriptor -__v")
       .sort({ createdAt: sort as SortOrder })
       .limit(Number(limit))
       .skip((Number(page) - 1) * Number(limit));
