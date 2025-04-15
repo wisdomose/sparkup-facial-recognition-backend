@@ -6,9 +6,8 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc ",
+    "build": "tsc",
     "start": "node build/index.js",
-    "postinstall": "husky install",
     "test": "jest --detectOpenHandles",
     "test --watch": "jest --watch --detectOpenHandles"
   },
@@ -34,7 +33,6 @@
   "dependencies": {
     "axios": "^1.6.3",
     "bcrypt": "^5.1.1",
-    "canvas": "^3.1.0",
     "cors": "^2.8.5",
     "env-schema": "^5.2.1",
     "express": "^5.0.0-beta.1",
@@ -45,6 +43,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.8",
     "pino": "^8.17.2",
+    "sharp": "^0.33.5",
     "zod": "^3.22.4"
   }
 }
