@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-// import * as tf from "@tensorflow/tfjs-node";
+import * as tf from "@tensorflow/tfjs-node";
 import UserModel from "./user.model";
 import * as faceapi from "face-api.js";
-import sharp from "sharp";
+import { Canvas, createCanvas, Image, loadImage } from "canvas";
 import userService from "./user.services";
 import config from "../../lib/config";
 import jwt from "jsonwebtoken";
@@ -12,18 +12,19 @@ import logger from "../../lib/logger";
 import { SortOrder } from "mongoose";
 import { UserLocal } from "../../types/global";
 
-// faceapi.env.monkeyPatch({ Canvas, Image });
-
 //@ts-ignore
+faceapi.env.monkeyPatch({ Canvas, Image });
+
 export async function signup(
   req: Request<{}, {}, UserSchema["Create"]["body"]>,
   res: Response<{}, { user: UserLocal }>
 ) {
   try {
     const { email, fullname, role, descriptor } = req.body;
-    const users = await UserModel.find();
+    const users = await UserModel.find({ email: { $ne: email } });
 
     if (users.length === 0) {
+      logger.info("SIGNUP: Creating first user");
       const user = await UserModel.create({
         descriptor: JSON.stringify(descriptor),
         email,
@@ -35,6 +36,7 @@ export async function signup(
     }
 
     // check if a user exists by using faceapi to match the descriptor
+    logger.info("SIGNUP: checking if users exist");
     let parsed: any[] = [];
     users.forEach((user) => {
       let rawDescriptors = JSON.parse(user.descriptor as any) as Descriptor[];
@@ -50,7 +52,9 @@ export async function signup(
       );
     });
 
-    logger.info("Before image loaded");
+    logger.info("SIGNUP: no user exists with face");
+
+    logger.info("SIGNUP: load image");
     // Set up face matcher with existing users
     const distance = 0.45;
     const faceMatcher = new faceapi.FaceMatcher(parsed, distance);
@@ -81,8 +85,9 @@ export async function signup(
         });
       }
     }
-    logger.info("After image loaded");
+    logger.info("SIGNUP: image loaded");
 
+    logger.info("SIGNUP: Creating user");
     const user = await UserModel.create({
       descriptor: JSON.stringify(req.body.descriptor),
       email,
@@ -90,6 +95,7 @@ export async function signup(
       role,
     });
 
+    logger.info("SIGNUP: user created");
     return res.send({ message: "Account created successfully" });
   } catch (error: any) {
     throw new Exception({
@@ -124,25 +130,27 @@ export async function login(
     });
 
     const distance = 0.45;
-    
-    // Process the image using sharp
-    const imageBuffer = Buffer.from(req.body.face.split(',')[1], 'base64');
-    const { data, info } = await sharp(imageBuffer)
-      .toBuffer({ resolveWithObject: true });
-
-    // Create a canvas-like object for face-api.js
-    const canvas = {
-      width: info.width,
-      height: info.height,
-      getContext: () => ({
-        drawImage: () => {},
-        getImageData: () => ({
-          data: new Uint8ClampedArray(data),
-          width: info.width,
-          height: info.height
-        })
+    // Read the image using canvas or other method
+    const img = await loadImage(req.body.face)
+      .then((img) => {
+        console.log("img loaded");
+        return img;
       })
-    };
+      .catch((error) => {
+        throw new Error(`Failed to load image: ${error.message}`);
+      });
+
+    // get the image in ImageData
+    const canvas = createCanvas(img.width, img.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+
+    // const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    // any because the client canvas type is different from the node canvas type
+    // let temp = faceapi.createCanvasFromMedia(imageData as any);
+    // Process the image for the model
+    const displaySize = { width: img.width, height: img.height };
+    // faceapi.matchDimensions(temp, displaySize);
 
     const faceMatcher = new faceapi.FaceMatcher(parsed, distance);
 
@@ -151,12 +159,12 @@ export async function login(
       .withFaceLandmarks()
       .withFaceDescriptors();
 
-    const displaySize = { width: info.width, height: info.height };
     const resizedDetections = faceapi.resizeResults(detections, displaySize);
     const results = resizedDetections.map((d) =>
       faceMatcher.findBestMatch(d.descriptor)
     );
 
+    // console.log(descriptors);
     const face = results.find((result) => result.distance <= distance);
 
     const id = face?.label;
