@@ -20,6 +20,19 @@ export async function createResult(
       });
     }
 
+    const existingResult = await resultService.findOne({
+      session,
+      semester,
+      studentId: new Types.ObjectId(studentId),
+    });
+
+    if (existingResult) {
+      throw new Exception({
+        message: "Result already exists",
+        code: 400,
+      });
+    }
+
     const result = await resultService.createOne({
       session,
       semester,
@@ -39,17 +52,46 @@ export async function createResult(
   }
 }
 
+// export async function findOneResult(
+//   req: Request<ResultSchema["FindOneResult"]["params"], {}, {}, ResultSchema["FindOneResult"]["query"]>,
+//   res: Response<{}, { user: UserLocal }>
+// ) {
+//   try {
+//     const { session, semester, studentId } = req.query;
+
+//     const result = await resultService.findOne({
+//       session,
+//       semester,
+//       studentId: new Types.ObjectId(studentId),
+//     });
+
+//     if (!result) {
+//       throw new Exception({
+//         message: "Result not found",
+//         code: 404,
+//       });
+//     }
+
+//     return res
+//       .status(200)
+//       .json({ data: result.toObject(), message: "Result found" });
+//   } catch (error: any) {
+//     throw new Exception({
+//       message: error?.message ?? "Failed to find result",
+//       code: error?.code ?? 400,
+//     });
+//   }
+// }
+
 export async function findOneResult(
-  req: Request<{}, {}, {}, ResultSchema["FindOneResult"]["query"]>,
+  req: Request<ResultSchema["FindOneResult"]["params"]>,
   res: Response<{}, { user: UserLocal }>
 ) {
   try {
-    const { session, semester, studentId } = req.query;
+    const { resultId } = req.params;
 
     const result = await resultService.findOne({
-      session,
-      semester,
-      studentId: new Types.ObjectId(studentId),
+      _id: new Types.ObjectId(resultId),
     });
 
     if (!result) {
@@ -94,11 +136,16 @@ export async function findAllResults(
 }
 
 export async function updateResult(
-  req: Request<{}, {}, ResultSchema["UpdateResult"]["body"]>,
+  req: Request<
+    ResultSchema["UpdateResult"]["params"],
+    {},
+    ResultSchema["UpdateResult"]["body"]
+  >,
   res: Response<{}, { user: UserLocal }>
 ) {
   try {
-    const { session, semester, courses, studentId } = req.body;
+    const { resultId } = req.params;
+    const { session, semester, courses } = req.body;
     const uploadedById = res.locals.user._id;
 
     if (res.locals.user.role !== "admin") {
@@ -108,25 +155,33 @@ export async function updateResult(
       });
     }
 
+    const existingResult = await resultService.findOne({
+      _id: new Types.ObjectId(resultId),
+    });
+
+    if (!existingResult) {
+      throw new Exception({
+        message: "Result not found",
+        code: 404,
+      });
+    }
+
     const result = await resultService.updateOne(
       {
-        session,
-        semester,
-        studentId: new Types.ObjectId(studentId),
+        _id: new Types.ObjectId(resultId),
       },
       {
         session,
         semester,
         courses,
-        studentId: new Types.ObjectId(studentId),
         uploadedById: new Types.ObjectId(uploadedById),
       }
     );
 
     if (!result) {
       throw new Exception({
-        message: "Result not found",
-        code: 404,
+        message: "Failed to update result",
+        code: 400,
       });
     }
 
@@ -142,11 +197,11 @@ export async function updateResult(
 }
 
 export async function deleteResult(
-  req: Request<{}, {}, {}, ResultSchema["DeleteResult"]["query"]>,
+  req: Request<ResultSchema["DeleteResult"]["params"]>,
   res: Response<{}, { user: UserLocal }>
 ) {
   try {
-    const { session, semester, studentId } = req.query;
+    const { resultId } = req.params;
 
     if (res.locals.user.role !== "admin") {
       throw new Exception({
@@ -156,9 +211,7 @@ export async function deleteResult(
     }
 
     const result = await resultService.findOne({
-      session,
-      semester,
-      studentId: new Types.ObjectId(studentId),
+      _id: new Types.ObjectId(resultId),
     });
 
     if (!result) {

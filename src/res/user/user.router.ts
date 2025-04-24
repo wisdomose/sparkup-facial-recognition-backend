@@ -26,7 +26,7 @@ export default function userRouter() {
     findAll
   );
   router.put(
-    "/:id",
+    "/",
     protectedRoute,
     schemaValidator(userSchema.updateUserSchema),
     update

@@ -274,6 +274,12 @@ export async function update(
 ) {
   try {
     const { _id, ...user } = res.locals.user;
+
+    if (req.body.email && req.body.email !== user.email) {
+      const existingUser = await userService.findOne({ email: req.body.email });
+      if (existingUser) throw new Error("Email already in use by another user");
+    }
+
     const {
       fullname = user.fullname,
       email = user.email,

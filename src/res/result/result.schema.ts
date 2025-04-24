@@ -9,7 +9,7 @@ const createResultSchema = z.object({
         code: z.string().min(3),
         title: z.string().min(3),
         unit: z.number().min(1),
-        grade: z.number().min(1),
+        grade: z.number().min(0),
       })
     ),
     studentId: z.string(),
@@ -17,22 +17,28 @@ const createResultSchema = z.object({
 });
 
 const findOneSchema = z.object({
-  query: z.object({
-    session: z.string().min(3),
-    semester: z.string().min(3),
-    studentId: z.string(),
+  params: z.object({
+    resultId: z.string(),
   }),
+  // query: z.object({
+  //   session: z.string().min(3),
+  //   semester: z.string().min(3),
+  //   studentId: z.string(),
+  // }),
 });
 
 const findAllSchema = z.object({
   query: z.object({
-    session: z.string().min(3),
-    semester: z.string().min(3),
+    session: z.string().min(3).optional(),
+    semester: z.string().min(3).optional(),
     studentId: z.string(),
   }),
 });
 
 const updateResultSchema = z.object({
+  params: z.object({
+    resultId: z.string(),
+  }),
   body: z.object({
     semester: z.string().min(3),
     session: z.string().min(3),
@@ -41,19 +47,21 @@ const updateResultSchema = z.object({
         code: z.string().min(3),
         title: z.string().min(3),
         unit: z.number().min(1),
-        grade: z.number().min(1),
+        grade: z.number().min(0),
       })
     ),
-    studentId: z.string(),
   }),
 });
 
 const deleteResultSchema = z.object({
-  query: z.object({
-    session: z.string().min(3),
-    semester: z.string().min(3),
-    studentId: z.string(),
+  params: z.object({
+    resultId: z.string(),
   }),
+  // query: z.object({
+  //   session: z.string().min(3),
+  //   semester: z.string().min(3),
+  //   studentId: z.string(),
+  // }),
 });
 
 const resultSchema = {
