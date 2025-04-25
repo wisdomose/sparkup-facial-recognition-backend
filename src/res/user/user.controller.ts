@@ -245,7 +245,7 @@ export async function login(
         accessToken: token,
         user: {
           email: userJson.email,
-          id: userJson._id,
+          _id: userJson._id,
           role: userJson.role,
           fullname: userJson.fullname,
           createdAt: userJson.createdAt,
