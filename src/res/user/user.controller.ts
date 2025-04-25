@@ -21,6 +21,15 @@ export async function signup(
 ) {
   try {
     const { email, fullname, role, descriptor } = req.body;
+
+    // First check if email already exists
+    const existingUserByEmail = await UserModel.findOne({ email });
+    if (existingUserByEmail) {
+      return res.status(400).json({
+        error: "An account with this email already exists",
+      });
+    }
+
     const users = await UserModel.find({ email: { $ne: email } });
 
     if (descriptor.length === 0) throw new Error("Failed to enroll face");
@@ -38,55 +47,96 @@ export async function signup(
 
     // check if a user exists by using faceapi to match the descriptor
     logger.info("SIGNUP: checking if users exist");
-    let parsed: any[] = [];
-    users.forEach((user) => {
-      let rawDescriptors = JSON.parse(user.descriptor as any) as Descriptor[];
-      let descriptors = rawDescriptors.map((descriptor) => {
-        let b: number[] = [];
-        for (let i in descriptor) {
-          b.push(descriptor[i]);
+    const parsed = users
+      .map((user) => {
+        try {
+          const rawDescriptors = JSON.parse(
+            user.descriptor as string
+          ) as Descriptor[];
+          const descriptors = rawDescriptors.map((desc) => {
+            const floatArray = new Float32Array(128);
+            for (let i = 0; i < 128; i++) {
+              floatArray[i] = desc[i] || 0; // Safely handle missing values
+            }
+            return floatArray;
+          });
+          return new faceapi.LabeledFaceDescriptors(
+            user._id.toString(),
+            descriptors
+          );
+        } catch (err) {
+          logger.error(
+            `Failed to parse descriptor for user ${user._id}: ${err}`
+          );
+          return null;
         }
-        return new Float32Array(b);
-      });
-      parsed.push(
-        new faceapi.LabeledFaceDescriptors(user._id.toString(), descriptors)
-      );
-    });
+      })
+      .filter(Boolean);
 
     logger.info("SIGNUP: no user exists with face");
 
     logger.info("SIGNUP: load image");
     // Set up face matcher with existing users
-    const distance = 0.45;
+    const distance = 0.35; // Lower threshold for stricter matching
     const faceMatcher = new faceapi.FaceMatcher(parsed, distance);
 
     // Check if any of the provided descriptors match existing users
     const newDescriptors = req.body.descriptor;
+    let faceMatchFound = false;
+    let bestMatchDistance = Infinity;
+    let bestMatchLabel = "";
 
-    for (let descriptor of newDescriptors) {
+    for (let i = 0; i < descriptor.length; i++) {
+      const currentDescriptor = descriptor[i];
+
       // Ensure descriptor has correct length
-      if (Object.keys(descriptor).length !== 128) {
-        return res.status(400).json({
-          error: "Invalid descriptor length - must be 128 values",
-        });
+      if (!currentDescriptor || Object.keys(currentDescriptor).length !== 128) {
+        logger.warn(`SIGNUP: Invalid descriptor at index ${i} - skipping`);
+        continue;
       }
 
       // Convert to Float32Array ensuring correct order
-      let orderedArray = new Array(128);
-      for (let i = 0; i < 128; i++) {
-        orderedArray[i] = descriptor[i];
+      const orderedArray = new Float32Array(128);
+      for (let j = 0; j < 128; j++) {
+        orderedArray[j] = currentDescriptor[j] || 0;
       }
-      const inputDescriptor = new Float32Array(orderedArray);
 
-      const match = faceMatcher.findBestMatch(inputDescriptor);
+      try {
+        const match = faceMatcher.findBestMatch(orderedArray);
 
-      if (match.distance <= distance) {
-        return res.status(400).json({
-          error: "A user with this face already exists",
-        });
+        // Keep track of the best match across all descriptors
+        if (match.distance < bestMatchDistance) {
+          bestMatchDistance = match.distance;
+          bestMatchLabel = match.label;
+        }
+
+        if (match.distance <= distance) {
+          faceMatchFound = true;
+          logger.info(
+            `SIGNUP: Face match found with distance ${match.distance} for user ${match.label}`
+          );
+          break;
+        }
+      } catch (err) {
+        logger.error(`SIGNUP: Error matching descriptor at index ${i}: ${err}`);
       }
     }
-    logger.info("SIGNUP: image loaded");
+
+    if (faceMatchFound) {
+      logger.info(
+        `SIGNUP: Face match found with distance ${bestMatchDistance} and label ${bestMatchLabel}`
+      );
+      return res.status(400).json({
+        error: "A user with this face already exists",
+      });
+    }
+
+    // Validate that we have at least one good quality face descriptor
+    if (bestMatchDistance === Infinity) {
+      return res.status(400).json({
+        error: "No valid face descriptors provided",
+      });
+    }
 
     logger.info("SIGNUP: Creating user");
     const user = await UserModel.create({
